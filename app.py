@@ -6,9 +6,11 @@ from redvid import Downloader
 
 app = Flask(__name__)
 
+
 @app.get("/")
 def home():
     return {"status": "ok", "service": "reddit-video-api"}
+
 
 @app.post("/download")
 def download():
@@ -23,22 +25,29 @@ def download():
 
         reddit = Downloader(max_q=True)
 
-        # redvid 2.0.6 expects the v.redd.it ID, not the full URL
-        video_id = url.rstrip("/").split("/")[-1]
-        reddit.url = video_id
+        # redvid expects the full v.redd.it URL
+        reddit.url = url
         reddit.path = workdir + "/"
 
         result = reddit.download()
 
-        file_path = result if isinstance(result, str) and os.path.exists(result) else None
+        # If redvid returns the path directly
+        file_path = (
+            result
+            if isinstance(result, str) and os.path.exists(result)
+            else None
+        )
 
+        # Otherwise find the resulting MP4 in the temp directory
         if not file_path:
             files = glob.glob(os.path.join(workdir, "*.mp4"))
             if files:
                 file_path = max(files, key=os.path.getmtime)
 
         if not file_path:
-            return jsonify({"error": "download finished but mp4 was not found"}), 500
+            return jsonify({
+                "error": "download finished but mp4 was not found"
+            }), 500
 
         return send_file(
             file_path,
@@ -48,4 +57,8 @@ def download():
         )
 
     except BaseException as e:
-        return jsonify({"error": str(e), "type": type(e).__name__}), 500
+        return jsonify({
+            "error": str(e),
+            "type": type(e).__name__,
+            "received_url": url
+        }), 500
