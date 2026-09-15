@@ -1,15 +1,16 @@
-import os
-import glob
-import tempfile
-from flask import Flask, request, send_file, jsonify
-from redvid import Downloader
+import requests
+from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
 
 @app.get("/")
 def home():
-    return {"status": "ok", "service": "reddit-video-api"}
+    return {
+        "status": "ok",
+        "service": "reddit-video-api",
+        "mode": "reddit-debug"
+    }
 
 
 @app.post("/download")
@@ -21,44 +22,36 @@ def download():
         return jsonify({"error": "url is required"}), 400
 
     try:
-        workdir = tempfile.mkdtemp()
+        headers = {
+            "User-Agent": "Mozilla/5.0"
+        }
 
-        reddit = Downloader(max_q=True)
-
-        # redvid expects the full v.redd.it URL
-        reddit.url = url
-        reddit.path = workdir + "/"
-
-        result = reddit.download()
-
-        # If redvid returns the path directly
-        file_path = (
-            result
-            if isinstance(result, str) and os.path.exists(result)
-            else None
+        r = requests.get(
+            url,
+            headers=headers,
+            allow_redirects=True,
+            timeout=20
         )
 
-        # Otherwise find the resulting MP4 in the temp directory
-        if not file_path:
-            files = glob.glob(os.path.join(workdir, "*.mp4"))
-            if files:
-                file_path = max(files, key=os.path.getmtime)
+        content_type = r.headers.get("content-type", "")
 
-        if not file_path:
-            return jsonify({
-                "error": "download finished but mp4 was not found"
-            }), 500
+        if "text" in content_type or "json" in content_type:
+            body_preview = r.text[:500]
+        else:
+            body_preview = "[binary response]"
 
-        return send_file(
-            file_path,
-            mimetype="video/mp4",
-            as_attachment=True,
-            download_name="reddit.mp4"
-        )
+        return jsonify({
+            "input_url": url,
+            "status_code": r.status_code,
+            "final_url": r.url,
+            "content_type": content_type,
+            "content_length": r.headers.get("content-length"),
+            "body_preview": body_preview
+        })
 
     except BaseException as e:
         return jsonify({
             "error": str(e),
             "type": type(e).__name__,
-            "received_url": url
+            "input_url": url
         }), 500
