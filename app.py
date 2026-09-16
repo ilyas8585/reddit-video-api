@@ -11,9 +11,19 @@ API_ID = int(os.environ["TG_API_ID"])
 API_HASH = os.environ["TG_API_HASH"]
 TG_SESSION = os.environ["TG_SESSION"]
 
+SOURCE_CHANNEL = "davay_esche"
+
 
 def run_async(coro):
     return asyncio.run(coro)
+
+
+def make_client():
+    return TelegramClient(
+        StringSession(TG_SESSION),
+        API_ID,
+        API_HASH
+    )
 
 
 @app.get("/")
@@ -28,30 +38,15 @@ def home():
 def telegram_test():
 
     async def test():
-        client = TelegramClient(
-            StringSession(TG_SESSION),
-            API_ID,
-            API_HASH
-        )
-
+        client = make_client()
         await client.connect()
 
         try:
             authorized = await client.is_user_authorized()
 
-            if not authorized:
-                return {
-                    "status": "error",
-                    "authorized": False
-                }
-
-            me = await client.get_me()
-
             return {
                 "status": "ok",
-                "authorized": True,
-                "user_id": me.id,
-                "first_name": me.first_name
+                "authorized": authorized
             }
 
         finally:
@@ -59,6 +54,63 @@ def telegram_test():
 
     try:
         return jsonify(run_async(test()))
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "type": type(e).__name__,
+            "error": str(e)
+        }), 500
+
+
+@app.get("/telegram/videos")
+def telegram_videos():
+
+    async def get_videos():
+        client = make_client()
+        await client.connect()
+
+        try:
+            if not await client.is_user_authorized():
+                return {
+                    "status": "error",
+                    "error": "Telegram session is not authorized"
+                }
+
+            entity = await client.get_entity(SOURCE_CHANNEL)
+
+            videos = []
+
+            async for message in client.iter_messages(entity, limit=30):
+
+                if not message.video:
+                    continue
+
+                videos.append({
+                    "message_id": message.id,
+                    "date": message.date.isoformat(),
+                    "caption": message.message or "",
+                    "views": message.views or 0,
+                    "duration": getattr(message.video, "duration", None),
+                    "size": getattr(message.video, "size", None),
+                    "link": f"https://t.me/{SOURCE_CHANNEL}/{message.id}"
+                })
+
+                if len(videos) >= 10:
+                    break
+
+            return {
+                "status": "ok",
+                "channel": SOURCE_CHANNEL,
+                "count": len(videos),
+                "videos": videos
+            }
+
+        finally:
+            await client.disconnect()
+
+    try:
+        return jsonify(run_async(get_videos()))
 
     except Exception as e:
         return jsonify({
