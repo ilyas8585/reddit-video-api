@@ -2,7 +2,7 @@ import os
 import asyncio
 import tempfile
 
-from flask import Flask, jsonify, send_file, after_this_request
+from flask import Flask, jsonify, send_file
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 
@@ -18,7 +18,12 @@ API_ID = int(os.environ["TG_API_ID"])
 API_HASH = os.environ["TG_API_HASH"]
 TG_SESSION = os.environ["TG_SESSION"]
 
-SOURCE_CHANNEL = "prikoly_memy_yumorn"
+SOURCE_CHANNELS = [
+    "prikoly_memy_yumorn",
+    "fun_vidos",
+    "kzprikoli",
+    "zhabqua"
+]
 
 
 # =========================
@@ -45,7 +50,8 @@ def make_client():
 def home():
     return {
         "status": "ok",
-        "service": "oibay-telegram"
+        "service": "oibay-telegram",
+        "channels": SOURCE_CHANNELS
     }
 
 
@@ -77,13 +83,13 @@ def telegram_test():
     except Exception as e:
         return jsonify({
             "status": "error",
-            "type": type(e).__name__,
-            "error": str(e)
+            "error": str(e),
+            "type": type(e).__name__
         }), 500
 
 
 # =========================
-# GET RECENT VIDEOS
+# GET VIDEOS
 # =========================
 
 @app.get("/telegram/videos")
@@ -94,70 +100,98 @@ def telegram_videos():
         client = make_client()
         await client.connect()
 
+        result = []
+
         try:
-            if not await client.is_user_authorized():
-                return {
-                    "status": "error",
-                    "error": "Telegram session is not authorized"
-                }
 
-            entity = await client.get_entity(SOURCE_CHANNEL)
+            for channel_name in SOURCE_CHANNELS:
 
-            videos = []
+                try:
+                    entity = await client.get_entity(channel_name)
 
-            async for message in client.iter_messages(
-                entity,
-                limit=30
-            ):
+                    # Берём последние сообщения с запасом,
+                    # чтобы найти до 10 видео с каждого канала
+                    async for message in client.iter_messages(
+                        entity,
+                        limit=50
+                    ):
 
-                if not message.video:
-                    continue
+                        if not message.video:
+                            continue
 
-                videos.append({
-                    "message_id": message.id,
-                    "date": message.date.isoformat(),
-                    "caption": message.message or "",
-                    "views": message.views or 0,
-                    "duration": getattr(
-                        message.video,
-                        "duration",
-                        None
-                    ),
-                    "size": getattr(
-                        message.video,
-                        "size",
-                        None
-                    ),
-                    "link": (
-                        f"https://t.me/"
-                        f"{SOURCE_CHANNEL}/"
-                        f"{message.id}"
-                    )
-                })
+                        result.append({
+                            "channel": channel_name,
+                            "message_id": message.id,
+                            "caption": message.message or "",
+                            "views": message.views or 0,
+                            "date": (
+                                message.date.isoformat()
+                                if message.date
+                                else None
+                            ),
 
-                if len(videos) >= 10:
-                    break
+                            # Уникальная ссылка одновременно является
+                            # хорошим ключом для Remove Duplicates в n8n
+                            "link": (
+                                f"https://t.me/"
+                                f"{channel_name}/"
+                                f"{message.id}"
+                            ),
+
+                            # Используем это поле для скачивания
+                            "download_url": (
+                                f"/telegram/video/"
+                                f"{channel_name}/"
+                                f"{message.id}"
+                            )
+                        })
+
+                        # Максимум 10 видео с одного канала
+                        channel_count = sum(
+                            1 for item in result
+                            if item["channel"] == channel_name
+                        )
+
+                        if channel_count >= 10:
+                            break
+
+                except Exception as channel_error:
+
+                    # Ошибка одного канала не ломает остальные
+                    result.append({
+                        "channel": channel_name,
+                        "error": str(channel_error)
+                    })
+
+            # Самые свежие ролики первыми
+            valid_videos = [
+                item for item in result
+                if "message_id" in item
+            ]
+
+            valid_videos.sort(
+                key=lambda x: x["date"] or "",
+                reverse=True
+            )
 
             return {
                 "status": "ok",
-                "channel": SOURCE_CHANNEL,
-                "count": len(videos),
-                "videos": videos
+                "channels": SOURCE_CHANNELS,
+                "count": len(valid_videos),
+                "videos": valid_videos
             }
 
         finally:
             await client.disconnect()
 
     try:
-        return jsonify(
-            run_async(get_videos())
-        )
+        return jsonify(run_async(get_videos()))
 
     except Exception as e:
         return jsonify({
             "status": "error",
-            "type": type(e).__name__,
-            "error": str(e)
+            "error": str(e),
+            "type": type(e).__name__
         }), 500
 
 
@@ -165,75 +199,84 @@ def telegram_videos():
 # DOWNLOAD VIDEO
 # =========================
 
-@app.get("/telegram/video/<int:message_id>")
-def telegram_video(message_id):
+@app.get("/telegram/video/<channel>/<int:message_id>")
+def telegram_video(channel, message_id):
 
-    async def download_video():
+    # Разрешаем скачивание только
+    # из каналов нашего списка
+    if channel not in SOURCE_CHANNELS:
+        return jsonify({
+            "status": "error",
+            "error": "Channel not allowed"
+        }), 404
+
+    async def download():
 
         client = make_client()
         await client.connect()
 
         try:
-            if not await client.is_user_authorized():
-                return None
+            entity = await client.get_entity(channel)
 
             message = await client.get_messages(
-                SOURCE_CHANNEL,
+                entity,
                 ids=message_id
             )
 
-            if not message or not message.video:
-                return None
+            if not message:
+                raise Exception("Message not found")
 
-            filepath = os.path.join(
-                tempfile.gettempdir(),
-                f"telegram_{message_id}.mp4"
+            if not message.video:
+                raise Exception("Message does not contain video")
+
+            temp_dir = tempfile.gettempdir()
+
+            file_path = os.path.join(
+                temp_dir,
+                f"telegram_{channel}_{message_id}.mp4"
             )
 
-            # ВАЖНО:
-            # скачиваем видео на диск,
-            # а не целиком в оперативную память.
-            await client.download_media(
+            downloaded = await client.download_media(
                 message,
-                file=filepath
+                file=file_path
             )
 
-            return filepath
+            if not downloaded:
+                raise Exception("Video download failed")
+
+            return downloaded
 
         finally:
             await client.disconnect()
 
     try:
-        filepath = run_async(
-            download_video()
-        )
-
-        if not filepath or not os.path.exists(filepath):
-            return jsonify({
-                "status": "error",
-                "error": "Video not found"
-            }), 404
-
-        @after_this_request
-        def cleanup(response):
-            try:
-                if os.path.exists(filepath):
-                    os.remove(filepath)
-            except Exception:
-                pass
-
-            return response
+        file_path = run_async(download())
 
         return send_file(
-            filepath,
+            file_path,
             mimetype="video/mp4",
             as_attachment=True,
-            download_name=f"telegram_{message_id}.mp4"
+            download_name=os.path.basename(file_path)
         )
 
     except Exception as e:
         return jsonify({
             "status": "error",
+            "error": str(e),
             "type": type(e).__name__,
-            "error": str(e)
+            "channel": channel,
+            "message_id": message_id
         }), 500
+
+
+# =========================
+# RUN
+# =========================
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+
+    app.run(
+        host="0.0.0.0",
+        port=port
+    )
