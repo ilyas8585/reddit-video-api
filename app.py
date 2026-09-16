@@ -11,9 +11,11 @@ API_HASH = os.environ["TG_API_HASH"]
 
 pending = {}
 
+
 @app.get("/")
 def home():
     return {"status": "ok", "service": "oibay-telegram"}
+
 
 @app.get("/test")
 def test():
@@ -22,9 +24,11 @@ def test():
         "telegram_configured": bool(API_ID and API_HASH)
     }
 
+
 @app.post("/auth/send-code")
 def send_code():
     phone = (request.get_json(silent=True) or {}).get("phone")
+
     if not phone:
         return jsonify({"error": "phone required"}), 400
 
@@ -39,14 +43,30 @@ def send_code():
             "phone_code_hash": sent.phone_code_hash
         }
 
-        await client.disconnect()
+        delivery_type = type(sent.type).__name__
 
-    asyncio.run(run())
-    return {"status": "code_sent"}
+        await client.disconnect()
+        return delivery_type
+
+    try:
+        delivery_type = asyncio.run(run())
+
+        return {
+            "status": "code_sent",
+            "delivery": delivery_type
+        }
+
+    except Exception as e:
+        return jsonify({
+            "error": str(e),
+            "type": type(e).__name__
+        }), 400
+
 
 @app.post("/auth/verify")
 def verify():
     data = request.get_json(silent=True) or {}
+
     phone = data.get("phone")
     code = data.get("code")
 
@@ -61,6 +81,7 @@ def verify():
             API_ID,
             API_HASH
         )
+
         await client.connect()
 
         await client.sign_in(
@@ -70,7 +91,9 @@ def verify():
         )
 
         session_string = client.session.save()
+
         await client.disconnect()
+
         return session_string
 
     try:
