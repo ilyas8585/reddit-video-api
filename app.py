@@ -1,6 +1,6 @@
 import os
 import asyncio
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 
@@ -9,7 +9,7 @@ app = Flask(__name__)
 API_ID = int(os.environ["TG_API_ID"])
 API_HASH = os.environ["TG_API_HASH"]
 
-pending = {}
+qr_state = {}
 
 
 @app.get("/")
@@ -17,43 +17,25 @@ def home():
     return {"status": "ok", "service": "oibay-telegram"}
 
 
-@app.get("/test")
-def test():
-    return {
-        "status": "ok",
-        "telegram_configured": bool(API_ID and API_HASH)
-    }
-
-
-@app.post("/auth/send-code")
-def send_code():
-    phone = (request.get_json(silent=True) or {}).get("phone")
-
-    if not phone:
-        return jsonify({"error": "phone required"}), 400
-
+@app.get("/auth/qr")
+def create_qr():
     async def run():
         client = TelegramClient(StringSession(), API_ID, API_HASH)
         await client.connect()
 
-        sent = await client.send_code_request(phone)
+        qr_login = await client.qr_login()
 
-        pending[phone] = {
-            "session": client.session.save(),
-            "phone_code_hash": sent.phone_code_hash
-        }
+        qr_state["client"] = client
+        qr_state["qr_login"] = qr_login
 
-        delivery_type = type(sent.type).__name__
-
-        await client.disconnect()
-        return delivery_type
+        return qr_login.url
 
     try:
-        delivery_type = asyncio.run(run())
+        url = asyncio.run(run())
 
         return {
-            "status": "code_sent",
-            "delivery": delivery_type
+            "status": "qr_ready",
+            "qr_url": url
         }
 
     except Exception as e:
@@ -63,46 +45,31 @@ def send_code():
         }), 400
 
 
-@app.post("/auth/verify")
-def verify():
-    data = request.get_json(silent=True) or {}
-
-    phone = data.get("phone")
-    code = data.get("code")
-
-    if phone not in pending:
-        return jsonify({"error": "send code first"}), 400
-
+@app.get("/auth/qr-check")
+def qr_check():
     async def run():
-        p = pending[phone]
+        client = qr_state.get("client")
+        qr_login = qr_state.get("qr_login")
 
-        client = TelegramClient(
-            StringSession(p["session"]),
-            API_ID,
-            API_HASH
-        )
+        if not client or not qr_login:
+            return {"status": "create_qr_first"}
 
-        await client.connect()
+        try:
+            await qr_login.wait(timeout=5)
 
-        await client.sign_in(
-            phone=phone,
-            code=code,
-            phone_code_hash=p["phone_code_hash"]
-        )
+            session_string = client.session.save()
+            await client.disconnect()
 
-        session_string = client.session.save()
+            return {
+                "status": "authorized",
+                "session": session_string
+            }
 
-        await client.disconnect()
-
-        return session_string
+        except asyncio.TimeoutError:
+            return {"status": "waiting_for_scan"}
 
     try:
-        session_string = asyncio.run(run())
-
-        return {
-            "status": "authorized",
-            "session": session_string
-        }
+        return asyncio.run(run())
 
     except Exception as e:
         return jsonify({
