@@ -118,3 +118,58 @@ def telegram_videos():
             "type": type(e).__name__,
             "error": str(e)
         }), 500
+from flask import Response
+
+
+@app.get("/telegram/video/<int:message_id>")
+def telegram_video(message_id):
+
+    async def download_video():
+        client = make_client()
+        await client.connect()
+
+        try:
+            message = await client.get_messages(
+                SOURCE_CHANNEL,
+                ids=message_id
+            )
+
+            if not message or not message.video:
+                return None, None
+
+            data = await client.download_media(
+                message,
+                file=bytes
+            )
+
+            filename = f"telegram_{message_id}.mp4"
+
+            return data, filename
+
+        finally:
+            await client.disconnect()
+
+    try:
+        data, filename = run_async(download_video())
+
+        if not data:
+            return jsonify({
+                "status": "error",
+                "error": "Video not found"
+            }), 404
+
+        return Response(
+            data,
+            mimetype="video/mp4",
+            headers={
+                "Content-Disposition":
+                    f'attachment; filename="{filename}"'
+            }
+        )
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "type": type(e).__name__,
+            "error": str(e)
+        }), 500
