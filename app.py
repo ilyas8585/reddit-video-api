@@ -18,7 +18,7 @@ API_ID = int(os.environ["TG_API_ID"])
 API_HASH = os.environ["TG_API_HASH"]
 TG_SESSION = os.environ["TG_SESSION"]
 
-SOURCE_CHANNEL = "davay_esche"
+SOURCE_CHANNEL = "prikoly_memy_yumorn"
 
 
 # =========================
