@@ -21,7 +21,7 @@ TG_SESSION = os.environ["TG_SESSION"]
 SOURCE_CHANNELS = [
     "prikoly_memy_yumorn",
     "fun_vidos",
-    "kzprikoli",
+    "faill_army",
     "zhabqua"
 ]
 
