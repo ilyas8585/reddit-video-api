@@ -288,7 +288,6 @@ def telegram_video(channel, message_id):
 
         try:
         file_path = run_async(download())
-
         sha = hashlib.sha256()
 
         with open(file_path, "rb") as f:
