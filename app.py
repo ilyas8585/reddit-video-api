@@ -14,8 +14,8 @@ app = Flask(__name__)
 # CONFIG
 # =========================
 
-API_ID = int(os.environ["API_ID"])
-API_HASH = os.environ["API_HASH"]
+API_ID = int(os.environ["TG_API_ID"])
+API_HASH = os.environ["TG_API_HASH"]
 TG_SESSION = os.environ["TG_SESSION"]
 
 SOURCE_CHANNELS = [
@@ -320,8 +320,8 @@ def telegram_frame(channel, message_id):
     async def make_frame():
         client = TelegramClient(
             StringSession(TG_SESSION),
-            TG_API_ID,
-            TG_API_HASH
+            API_ID,
+            API_HASH
         )
 
         await client.connect()
