@@ -309,6 +309,7 @@ def telegram_video(channel, message_id):
         )
 
         response.headers["X-Video-Hash"] = video_hash
+        save_hash(video_hash)
         return response
 
     except Exception as e:
