@@ -387,7 +387,7 @@ def telegram_frame_image(channel, message_id, number):
         return jsonify({"status": "error", "error": "Frame not found"}), 404
 
     return send_file(frame_path, mimetype="image/jpeg")
-    @app.get("/telegram/video-hash/<channel>/<int:message_id>")
+@app.get("/telegram/video-hash/<channel>/<int:message_id>")
 def telegram_video_hash(channel, message_id):
     video_path = f"/tmp/{channel}_{message_id}.mp4"
 
