@@ -286,15 +286,16 @@ def telegram_video(channel, message_id):
         finally:
             await client.disconnect()
 
-    try:
+        try:
         file_path = run_async(download())
+
         sha = hashlib.sha256()
 
         with open(file_path, "rb") as f:
             while chunk := f.read(1024 * 1024):
                 sha.update(chunk)
 
-                video_hash = sha.hexdigest()
+        video_hash = sha.hexdigest()
 
         if video_hash in load_hashes():
             return jsonify({
@@ -302,7 +303,7 @@ def telegram_video(channel, message_id):
                 "hash": video_hash
             }), 409
 
-            response = send_file(
+        response = send_file(
             file_path,
             mimetype="video/mp4",
             as_attachment=True,
@@ -310,7 +311,6 @@ def telegram_video(channel, message_id):
         )
 
         response.headers["X-Video-Hash"] = video_hash
-
         return response
 
     except Exception as e:
