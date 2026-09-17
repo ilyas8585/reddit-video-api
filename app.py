@@ -312,6 +312,26 @@ def telegram_published():
         "status": "ok",
         "published": key
     })
+    @app.get("/telegram/frame/<channel>/<int:message_id>")
+def telegram_frame(channel, message_id):
+    import subprocess
+    import imageio_ffmpeg
+
+    video_path = f"/tmp/{channel}_{message_id}.mp4"
+    frame_path = f"/tmp/{channel}_{message_id}.jpg"
+
+    video_url = f"http://127.0.0.1:{os.environ.get('PORT', 10000)}/telegram/video/{channel}/{message_id}"
+
+    subprocess.run([
+        imageio_ffmpeg.get_ffmpeg_exe(),
+        "-y",
+        "-ss", "00:00:02",
+        "-i", video_url,
+        "-frames:v", "1",
+        frame_path
+    ], check=True)
+
+    return send_file(frame_path, mimetype="image/jpeg")
 # =========================
 # RUN
 # =========================
