@@ -317,7 +317,7 @@ def telegram_frame(channel, message_id):
     import subprocess
     import imageio_ffmpeg
 
-    async def make_frame():
+    async def make_frames():
         client = TelegramClient(
             StringSession(TG_SESSION),
             API_ID,
@@ -333,7 +333,6 @@ def telegram_frame(channel, message_id):
                 raise Exception("Video not found")
 
             video_path = f"/tmp/{channel}_{message_id}.mp4"
-            frame_path = f"/tmp/{channel}_{message_id}.jpg"
 
             await client.download_media(message, file=video_path)
 
@@ -354,28 +353,27 @@ def telegram_frame(channel, message_id):
                 frames.append(frame)
 
             return frames
+
         finally:
             await client.disconnect()
 
-        try:
-            frames = run_async(make_frame())
-    
-            return jsonify({
-        "status": "ok",
-        "frames": [
-            f"/telegram/frame-image/{channel}/{message_id}/1",
-            f"/telegram/frame-image/{channel}/{message_id}/2",
-            f"/telegram/frame-image/{channel}/{message_id}/3"
-        ]
-    })
-    
-        except Exception as e:
-            return jsonify({
-                "status": "error",
-                "error": str(e)
-            }), 500
-@app.get("/telegram/frame-image/<channel>/<int:message_id>/<int:number>")
-def telegram_frame_image(channel, message_id, number):
+    try:
+        frames = run_async(make_frames())
+
+        return jsonify({
+            "status": "ok",
+            "frames": [
+                f"/telegram/frame-image/{channel}/{message_id}/1",
+                f"/telegram/frame-image/{channel}/{message_id}/2",
+                f"/telegram/frame-image/{channel}/{message_id}/3"
+            ]
+        })
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        }), 500def telegram_frame_image(channel, message_id, number):
     if number not in [1, 2, 3]:
         return jsonify({"status": "error"}), 404
 
