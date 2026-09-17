@@ -374,7 +374,7 @@ def telegram_frame(channel, message_id):
                 "status": "error",
                 "error": str(e)
             }), 500
-        @app.get("/telegram/frame-image/<channel>/<int:message_id>/<int:number>")
+@app.get("/telegram/frame-image/<channel>/<int:message_id>/<int:number>")
 def telegram_frame_image(channel, message_id, number):
     if number not in [1, 2, 3]:
         return jsonify({"status": "error"}), 404
