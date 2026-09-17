@@ -317,21 +317,49 @@ def telegram_frame(channel, message_id):
     import subprocess
     import imageio_ffmpeg
 
-    video_path = f"/tmp/{channel}_{message_id}.mp4"
-    frame_path = f"/tmp/{channel}_{message_id}.jpg"
+    async def make_frame():
+        client = TelegramClient(
+            StringSession(TG_SESSION),
+            TG_API_ID,
+            TG_API_HASH
+        )
 
-    video_url = f"http://127.0.0.1:{os.environ.get('PORT', 10000)}/telegram/video/{channel}/{message_id}"
+        await client.connect()
 
-    subprocess.run([
-        imageio_ffmpeg.get_ffmpeg_exe(),
-        "-y",
-        "-ss", "00:00:02",
-        "-i", video_url,
-        "-frames:v", "1",
-        frame_path
-    ], check=True)
+        try:
+            message = await client.get_messages(channel, ids=message_id)
 
-    return send_file(frame_path, mimetype="image/jpeg")
+            if not message or not message.video:
+                raise Exception("Video not found")
+
+            video_path = f"/tmp/{channel}_{message_id}.mp4"
+            frame_path = f"/tmp/{channel}_{message_id}.jpg"
+
+            await client.download_media(message, file=video_path)
+
+            subprocess.run([
+                imageio_ffmpeg.get_ffmpeg_exe(),
+                "-y",
+                "-ss", "00:00:02",
+                "-i", video_path,
+                "-frames:v", "1",
+                frame_path
+            ], check=True)
+
+            return frame_path
+
+        finally:
+            await client.disconnect()
+
+    try:
+        frame_path = run_async(make_frame())
+        return send_file(frame_path, mimetype="image/jpeg")
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        }), 500
 # =========================
 # RUN
 # =========================
