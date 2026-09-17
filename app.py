@@ -2,7 +2,7 @@ import os
 import asyncio
 import tempfile
 
-from flask import Flask, jsonify, send_file
+from flask import Flask, jsonify, send_file, request
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 
@@ -24,6 +24,25 @@ SOURCE_CHANNELS = [
     "faill_army",
     "zhabqua"
 ]
+
+# =========================
+# PUBLISHED VIDEOS
+# =========================
+
+PUBLISHED_FILE = "/tmp/oibay_published.txt"
+
+
+def load_published():
+    if not os.path.exists(PUBLISHED_FILE):
+        return set()
+
+    with open(PUBLISHED_FILE, "r") as f:
+        return set(line.strip() for line in f if line.strip())
+
+
+def save_published(key):
+    with open(PUBLISHED_FILE, "a") as f:
+        f.write(key + "\n")
 
 
 # =========================
@@ -101,6 +120,7 @@ def telegram_videos():
         await client.connect()
 
         result = []
+        published = load_published()
 
         try:
 
@@ -117,6 +137,10 @@ def telegram_videos():
                     ):
 
                         if not message.video:
+                            continue
+                            key = f"{channel_name}:{message.id}"
+
+                            if key in published:
                             continue
 
                         result.append({
@@ -268,7 +292,26 @@ def telegram_video(channel, message_id):
             "message_id": message_id
         }), 500
 
+@app.post("/telegram/published")
+def telegram_published():
+    data = request.get_json(silent=True) or {}
 
+    channel = data.get("channel")
+    message_id = data.get("message_id")
+
+    if not channel or not message_id:
+        return jsonify({
+            "status": "error",
+            "error": "channel and message_id required"
+        }), 400
+
+    key = f"{channel}:{message_id}"
+    save_published(key)
+
+    return jsonify({
+        "status": "ok",
+        "published": key
+    })
 # =========================
 # RUN
 # =========================
