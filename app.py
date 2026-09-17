@@ -337,29 +337,55 @@ def telegram_frame(channel, message_id):
 
             await client.download_media(message, file=video_path)
 
-            subprocess.run([
-                imageio_ffmpeg.get_ffmpeg_exe(),
-                "-y",
-                "-ss", "00:00:02",
-                "-i", video_path,
-                "-frames:v", "1",
-                frame_path
-            ], check=True)
+            frames = []
 
-            return frame_path
+for i, sec in enumerate([2, 5, 8], start=1):
+    frame = f"/tmp/{channel}_{message_id}_{i}.jpg"
+
+    subprocess.run([
+        imageio_ffmpeg.get_ffmpeg_exe(),
+        "-y",
+        "-ss", str(sec),
+        "-i", video_path,
+        "-frames:v", "1",
+        frame
+    ], check=True)
+
+    frames.append(frame)
+
+            return frames
 
         finally:
             await client.disconnect()
 
     try:
-        frame_path = run_async(make_frame())
-        return send_file(frame_path, mimetype="image/jpeg")
+        frames = run_async(make_frame())
+
+        return jsonify({
+    "status": "ok",
+    "frames": [
+        f"/telegram/frame-image/{channel}/{message_id}/1",
+        f"/telegram/frame-image/{channel}/{message_id}/2",
+        f"/telegram/frame-image/{channel}/{message_id}/3"
+    ]
+})
 
     except Exception as e:
         return jsonify({
             "status": "error",
             "error": str(e)
         }), 500
+        @app.get("/telegram/frame-image/<channel>/<int:message_id>/<int:number>")
+def telegram_frame_image(channel, message_id, number):
+    if number not in [1, 2, 3]:
+        return jsonify({"status": "error"}), 404
+
+    frame_path = f"/tmp/{channel}_{message_id}_{number}.jpg"
+
+    if not os.path.exists(frame_path):
+        return jsonify({"status": "error", "error": "Frame not found"}), 404
+
+    return send_file(frame_path, mimetype="image/jpeg")
 # =========================
 # RUN
 # =========================
