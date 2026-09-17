@@ -337,23 +337,23 @@ def telegram_frame(channel, message_id):
 
             await client.download_media(message, file=video_path)
 
-                    frames = []
+                                frames = []
 
-        for i, sec in enumerate([2, 5, 8], start=1):
-            frame = f"/tmp/{channel}_{message_id}_{i}.jpg"
+            for i, sec in enumerate([2, 5, 8], start=1):
+                frame = f"/tmp/{channel}_{message_id}_{i}.jpg"
 
-            subprocess.run([
-                imageio_ffmpeg.get_ffmpeg_exe(),
-                "-y",
-                "-ss", str(sec),
-                "-i", video_path,
-                "-frames:v", "1",
-                frame
-            ], check=True)
+                subprocess.run([
+                    imageio_ffmpeg.get_ffmpeg_exe(),
+                    "-y",
+                    "-ss", str(sec),
+                    "-i", video_path,
+                    "-frames:v", "1",
+                    frame
+                ], check=True)
 
-            frames.append(frame)
+                frames.append(frame)
 
-        return frames
+            return frames
         finally:
             await client.disconnect()
 
