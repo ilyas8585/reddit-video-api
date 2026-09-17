@@ -312,7 +312,7 @@ def telegram_published():
         "status": "ok",
         "published": key
     })
-    @app.get("/telegram/frame/<channel>/<int:message_id>")
+@app.get("/telegram/frame/<channel>/<int:message_id>")
 def telegram_frame(channel, message_id):
     import subprocess
     import imageio_ffmpeg
