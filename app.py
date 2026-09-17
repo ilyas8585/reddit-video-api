@@ -141,7 +141,7 @@ def telegram_videos():
                             key = f"{channel_name}:{message.id}"
 
                             if key in published:
-                            continue
+                                continue
 
                         result.append({
                             "channel": channel_name,
