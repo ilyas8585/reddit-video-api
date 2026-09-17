@@ -31,7 +31,19 @@ SOURCE_CHANNELS = [
 # =========================
 
 PUBLISHED_FILE = "/tmp/oibay_published.txt"
+HASH_FILE = "/tmp/oibay_hashes.txt"
 
+def load_hashes():
+    if not os.path.exists(HASH_FILE):
+        return set()
+
+    with open(HASH_FILE, "r") as f:
+        return set(line.strip() for line in f if line.strip())
+
+
+def save_hash(video_hash):
+    with open(HASH_FILE, "a") as f:
+        f.write(video_hash + "\n")
 
 def load_published():
     if not os.path.exists(PUBLISHED_FILE):
@@ -276,13 +288,30 @@ def telegram_video(channel, message_id):
 
     try:
         file_path = run_async(download())
+        sha = hashlib.sha256()
 
-        return send_file(
+        with open(file_path, "rb") as f:
+            while chunk := f.read(1024 * 1024):
+                sha.update(chunk)
+
+                video_hash = sha.hexdigest()
+
+        if video_hash in load_hashes():
+            return jsonify({
+                "status": "duplicate",
+                "hash": video_hash
+            }), 409
+
+               response = send_file(
             file_path,
             mimetype="video/mp4",
             as_attachment=True,
             download_name=os.path.basename(file_path)
         )
+
+        response.headers["X-Video-Hash"] = video_hash
+
+        return response
 
     except Exception as e:
         return jsonify({
