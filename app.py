@@ -357,23 +357,23 @@ def telegram_frame(channel, message_id):
         finally:
             await client.disconnect()
 
-    try:
-        frames = run_async(make_frame())
-
-        return jsonify({
-    "status": "ok",
-    "frames": [
-        f"/telegram/frame-image/{channel}/{message_id}/1",
-        f"/telegram/frame-image/{channel}/{message_id}/2",
-        f"/telegram/frame-image/{channel}/{message_id}/3"
-    ]
-})
-
-    except Exception as e:
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        }), 500
+        try:
+            frames = run_async(make_frame())
+    
+            return jsonify({
+        "status": "ok",
+        "frames": [
+            f"/telegram/frame-image/{channel}/{message_id}/1",
+            f"/telegram/frame-image/{channel}/{message_id}/2",
+            f"/telegram/frame-image/{channel}/{message_id}/3"
+        ]
+    })
+    
+        except Exception as e:
+            return jsonify({
+                "status": "error",
+                "error": str(e)
+            }), 500
         @app.get("/telegram/frame-image/<channel>/<int:message_id>/<int:number>")
 def telegram_frame_image(channel, message_id, number):
     if number not in [1, 2, 3]:
