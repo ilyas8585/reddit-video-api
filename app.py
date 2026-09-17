@@ -282,17 +282,16 @@ def telegram_video(channel, message_id):
                 raise Exception("Video download failed")
 
             return downloaded
-
         finally:
             await client.disconnect()
 
-        try:
-            file_path = run_async(download())
-            sha = hashlib.sha256()
+    try:
+        file_path = run_async(download())
+        sha = hashlib.sha256()
 
-            with open(file_path, "rb") as f:
-                while chunk := f.read(1024 * 1024):
-                    sha.update(chunk)
+        with open(file_path, "rb") as f:
+            while chunk := f.read(1024 * 1024):
+                sha.update(chunk)
 
         video_hash = sha.hexdigest()
 
