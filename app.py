@@ -282,14 +282,18 @@ def telegram_video(channel, message_id):
                 f"telegram_{channel}_{message_id}.mp4"
             )
 
+            # Если файл уже скачан — используем его повторно
+            if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+                return file_path
+            
             downloaded = await client.download_media(
                 message,
                 file=file_path
             )
-
+            
             if not downloaded:
                 raise Exception("Video download failed")
-
+            
             return downloaded
         finally:
             await client.disconnect()
