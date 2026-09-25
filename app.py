@@ -154,6 +154,12 @@ def telegram_videos():
 
                         if not message.video:
                             continue
+                            # Пропускаем длинные и тяжёлые видео
+                            if message.video.duration and message.video.duration > 45:
+                                continue
+                            
+                            if message.file and message.file.size and message.file.size > 25 * 1024 * 1024:
+                                continue
                             key = f"{channel_name}:{message.id}"
 
                             if key in published:
