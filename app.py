@@ -23,7 +23,10 @@ SOURCE_CHANNELS = [
     "prikoly_memy_yumorn",
     "fun_vidos",
     "faill_army",
-    "zhabqua"
+    "zhabqua",
+    "Pranks",
+    "FunnyVideos",
+    "funny_videotg"
 ]
 
 # =========================
