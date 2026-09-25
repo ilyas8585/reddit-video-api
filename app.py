@@ -307,13 +307,7 @@ def telegram_video(channel, message_id):
                 sha.update(chunk)
 
         video_hash = sha.hexdigest()
-
-        if video_hash in load_hashes():
-            return jsonify({
-                "status": "duplicate",
-                "hash": video_hash
-            }), 409
-
+        
         response = send_file(
             file_path,
             mimetype="video/mp4",
