@@ -156,8 +156,7 @@ def telegram_videos():
                             continue
                         
                         # Пропускаем видео длиннее 45 секунд
-                        if message.video.duration and message.video.duration > 45:
-                            continue
+                        
                         
                         # Пропускаем видео тяжелее 25 МБ
                         if message.file and message.file.size and message.file.size > 25 * 1024 * 1024:
