@@ -427,8 +427,8 @@ def telegram_frame_image(channel, message_id, number):
 
             await client.download_media(message, file=video_path)
 
-            sec = {1: 2, 2: 5, 3: 8}[number]
-
+            sec = {1: 0.5, 2: 1.0, 3: 1.5}[number]
+            
             subprocess.run([
                 imageio_ffmpeg.get_ffmpeg_exe(),
                 "-y",
